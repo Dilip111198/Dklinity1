@@ -4,6 +4,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dklinity - Clinical Trials Database with ARM & References</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Firebase App (the core Firebase SDK) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <!-- Add Firebase products that you want to use -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
@@ -261,7 +265,7 @@
 
         <nav class="mb-6 border-b border-gray-300">
           <ul id="tabs" class="flex flex-wrap gap-2 text-sm font-semibold text-gray-600">
-            <li><button data-tab="products" class="tab-btn px-4 py-2 rounded-t border border-b-0 border-gray-300 bg-gray-200 text-blue-900">Products (ARM-wise)</button></li>
+            <li><button data-tab="products" class="tab-btn px-4 py-2 rounded-t border border-b-0 border-gray-300 bg-gray-200 text-blue-900">ARM</button></li>
             <li><button data-tab="patients" class="tab-btn px-4 py-2 rounded-t border border-b-0 border-gray-300 hover:bg-gray-100">Patients (ARM-wise)</button></li>
             <li><button data-tab="adverseEvents" class="tab-btn px-4 py-2 rounded-t border border-b-0 border-gray-300 hover:bg-gray-100">Adverse Events (ARM-wise)</button></li>
             <li><button data-tab="responseData" class="tab-btn px-4 py-2 rounded-t border border-b-0 border-gray-300 hover:bg-gray-100">Response Data</button></li>
@@ -292,15 +296,45 @@
     const references = []; // unified references for all tabs
     const trial_products = [];
 
-    // Login credentials
-    const validUsername = 'Dilip';
-    const validPassword = 'Dilip@321';
+    // === Firebase Config ===
+    // TODO: Replace with your own Firebase project config
+    const firebaseConfig = {
+      apiKey: "AIzaSyAbqH9HAqyhYQoKyXz98NiFeR5J4_MMrC8",
+      authDomain: "dklinity-e7007.firebaseapp.com",
+      projectId: "dklinity-e7007",
+      storageBucket: "dklinity-e7007.appspot.com",
+      messagingSenderId: "337796630433",
+      appId: "1:337796630433:web:7216fface5e385c3acade0"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-    // Show login overlay initially
+    // Login credentials
+    // Store login credentials in localStorage if not already present
+    const defaultUsername = 'Dilip';
+    const defaultPassword = 'Dilip@321';
+    if (!localStorage.getItem('validUsername') || !localStorage.getItem('validPassword')) {
+      localStorage.setItem('validUsername', defaultUsername);
+      localStorage.setItem('validPassword', defaultPassword);
+    }
+    const validUsername = localStorage.getItem('validUsername');
+    const validPassword = localStorage.getItem('validPassword');
+
+
+    // Show login overlay or app content based on login status
     const loginOverlay = document.getElementById('loginOverlay');
     const appContent = document.getElementById('appContent');
     const loginForm = document.getElementById('loginForm');
     const loginMessage = document.getElementById('loginMessage');
+
+    // Check login status on page load
+    if (localStorage.getItem('isLoggedIn') === 'true') {
+      loginOverlay.classList.add('hidden');
+      appContent.classList.remove('hidden');
+    } else {
+      loginOverlay.classList.remove('hidden');
+      appContent.classList.add('hidden');
+    }
 
     loginForm.addEventListener('submit', e => {
       e.preventDefault();
@@ -308,6 +342,7 @@
       const password = loginForm.password.value;
 
       if (username === validUsername && password === validPassword) {
+        localStorage.setItem('isLoggedIn', 'true');
         loginOverlay.classList.add('hidden');
         appContent.classList.remove('hidden');
         loginForm.reset();
@@ -399,11 +434,6 @@
         showMessage('addTrialMessage', 'Trial ID is required.', true);
         return;
       }
-      // Check for duplicate trial_id
-      if (trials.some(t => t.id === trial_id)) {
-        showMessage('addTrialMessage', `Trial ID "${trial_id}" already exists. Please use a unique Trial ID.`, true);
-        return;
-      }
       const title = formData.get('title').trim();
       if (!title) {
         showMessage('addTrialMessage', 'Title is required.', true);
@@ -454,198 +484,422 @@
         end_date,
         created_at: new Date().toISOString()
       };
-      trials.push(newTrial);
-      this.reset();
-      // Reset dynamic inputs to one input each
-      addOtherStudyIdsContainer.innerHTML = '';
-      const firstOtherStudyInput = document.createElement('input');
-      firstOtherStudyInput.type = 'text';
-      firstOtherStudyInput.name = 'other_study_id';
-      firstOtherStudyInput.placeholder = 'Other Study ID';
-      firstOtherStudyInput.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
-      addOtherStudyIdsContainer.appendChild(firstOtherStudyInput);
 
-      addIndicationsContainer.innerHTML = '';
-      const firstIndicationInput = document.createElement('input');
-      firstIndicationInput.type = 'text';
-      firstIndicationInput.name = 'indication';
-      firstIndicationInput.placeholder = 'Indication';
-      firstIndicationInput.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
-      addIndicationsContainer.appendChild(firstIndicationInput);
-
-      productTagsContainer.innerHTML = '';
-      const firstProductTagInput = document.createElement('input');
-      firstProductTagInput.type = 'text';
-      firstProductTagInput.name = 'product_tag';
-      firstProductTagInput.placeholder = 'Product name';
-      firstProductTagInput.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
-      productTagsContainer.appendChild(firstProductTagInput);
-
-      showMessage('addTrialMessage', `Trial ID "${newTrial.id}" added successfully.`);
-
-      loadTrialDetails(newTrial.id);
-      document.getElementById('trialDetailsSection').scrollIntoView({ behavior: 'smooth' });
+      // Save to Firestore using trial_id as document ID for easier updates and duplicate prevention
+      console.log('[Firestore] Attempting to save trial:', newTrial);
+      db.collection('trials').doc(trial_id).get().then(docSnapshot => {
+        if (docSnapshot.exists) {
+          showMessage('addTrialMessage', `Trial ID "${trial_id}" already exists in Firestore. Please use a unique Trial ID.`, true);
+          return;
+        }
+        db.collection('trials').doc(trial_id).set(newTrial)
+          .then(() => {
+            console.log('[Firestore] Trial saved successfully:', newTrial);
+            showMessage('addTrialMessage', `Trial ID "${newTrial.id}" added successfully to Firebase.`);
+            // Reset form
+            document.getElementById('addTrialForm').reset();
+            addOtherStudyIdsContainer.innerHTML = '';
+            const firstOtherStudyInput = document.createElement('input');
+            firstOtherStudyInput.type = 'text';
+            firstOtherStudyInput.name = 'other_study_id';
+            firstOtherStudyInput.placeholder = 'Other Study ID';
+            firstOtherStudyInput.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
+            addOtherStudyIdsContainer.appendChild(firstOtherStudyInput);
+            addIndicationsContainer.innerHTML = '';
+            const firstIndicationInput = document.createElement('input');
+            firstIndicationInput.type = 'text';
+            firstIndicationInput.name = 'indication';
+            firstIndicationInput.placeholder = 'Indication';
+            firstIndicationInput.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
+            addIndicationsContainer.appendChild(firstIndicationInput);
+            productTagsContainer.innerHTML = '';
+            const firstProductTagInput = document.createElement('input');
+            firstProductTagInput.type = 'text';
+            firstProductTagInput.name = 'product_tag';
+            firstProductTagInput.placeholder = 'Product name';
+            firstProductTagInput.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
+            productTagsContainer.appendChild(firstProductTagInput);
+            // Show details
+            loadTrialDetailsFromFirestore(newTrial);
+            document.getElementById('trialDetailsSection').scrollIntoView({ behavior: 'smooth' });
+            // --- Refresh search results if visible ---
+            const searchSection = document.getElementById('search');
+            if (searchSection && !searchSection.classList.contains('hidden')) {
+              // Simulate a search submit to refresh results
+              const searchForm = document.getElementById('trialSearchForm');
+              if (searchForm) {
+                searchForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+              }
+            }
+          })
+          .catch((error) => {
+            console.error('[Firestore] Error saving trial:', error);
+            showMessage('addTrialMessage', `Error saving to Firebase: ${error.message}`, true);
+          });
+      }).catch((error) => {
+        console.error('[Firestore] Error checking for duplicate:', error);
+        showMessage('addTrialMessage', `Error checking for duplicate: ${error.message}`, true);
+      });
     });
 
     // Search Trials
-    document.getElementById('trialSearchForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-      const formData = new FormData(this);
-      const trialId = formData.get('trial_id').trim().toLowerCase();
-
-      // Collect multiple other_study_id inputs
-      const otherStudyIds = [];
-      this.querySelectorAll('input[name="other_study_id"]').forEach(input => {
-        const val = input.value.trim().toLowerCase();
-        if (val) otherStudyIds.push(val);
-      });
-
-      // Collect multiple indications inputs
-      const indications = [];
-      this.querySelectorAll('input[name="indication"]').forEach(input => {
-        const val = input.value.trim().toLowerCase();
-        if (val) indications.push(val);
-      });
-
-      const title = formData.get('title').trim().toLowerCase();
-      const phase = formData.get('phase');
-      const status = formData.get('status');
-
-      let results = trials.filter(trial => {
-        // Trial ID match (case insensitive)
-        const trialIdMatch = trialId === '' || (trial.id && trial.id.toLowerCase().includes(trialId));
-        // Other Study ID match: any of the entered otherStudyIds matches any in trial.other_study_id array (case insensitive)
-        let otherStudyIdMatch = true;
-        if (otherStudyIds.length > 0) {
-          if (!trial.other_study_id || !Array.isArray(trial.other_study_id)) {
-            otherStudyIdMatch = false;
-          } else {
-            otherStudyIdMatch = otherStudyIds.some(osid => trial.other_study_id.some(tosid => tosid.toLowerCase() === osid));
-          }
+document.getElementById('trialSearchForm').addEventListener('submit', function (e) {
+  e.preventDefault();
+  const formData = new FormData(this);
+  const trialId = formData.get('trial_id').trim().toLowerCase();
+  // Collect multiple other_study_id inputs
+  const otherStudyIds = [];
+  this.querySelectorAll('input[name="other_study_id"]').forEach(input => {
+    const val = input.value.trim().toLowerCase();
+    if (val) otherStudyIds.push(val);
+  });
+  // Collect multiple indications inputs
+  const indications = [];
+  this.querySelectorAll('input[name="indication"]').forEach(input => {
+    const val = input.value.trim().toLowerCase();
+    if (val) indications.push(val);
+  });
+  const title = formData.get('title').trim().toLowerCase();
+  const phase = formData.get('phase');
+  const status = formData.get('status');
+  const resultsContainer = document.getElementById('searchResults');
+  resultsContainer.innerHTML = '<p class="text-gray-600 italic">Searching Firestore...</p>';
+  // Fetch all trials from Firestore
+  db.collection('trials').get().then(querySnapshot => {
+    const trialsFromFirestore = [];
+    querySnapshot.forEach(doc => {
+      trialsFromFirestore.push(doc.data());
+    });
+    // Filter as before
+    let results = trialsFromFirestore.filter(trial => {
+      // Trial ID match (case insensitive)
+      const trialIdMatch = trialId === '' || (trial.id && trial.id.toLowerCase().includes(trialId));
+      // Other Study ID match: any of the entered otherStudyIds matches any in trial.other_study_id array (case insensitive)
+      let otherStudyIdMatch = true;
+      if (otherStudyIds.length > 0) {
+        if (!trial.other_study_id || !Array.isArray(trial.other_study_id)) {
+          otherStudyIdMatch = false;
+        } else {
+          otherStudyIdMatch = otherStudyIds.some(osid => trial.other_study_id.some(tosid => tosid.toLowerCase() === osid));
         }
-        // Indication match: any of the entered indications matches any in trial.indication array (case insensitive)
-        let indicationMatch = true;
-        if (indications.length > 0) {
-          if (!trial.indication || !Array.isArray(trial.indication)) {
-            indicationMatch = false;
-          } else {
-            indicationMatch = indications.some(ind => trial.indication.some(tind => tind.toLowerCase().includes(ind)));
-          }
+      }
+      // Indication match: any of the entered indications matches any in trial.indication array (case insensitive)
+      let indicationMatch = true;
+      if (indications.length > 0) {
+        if (!trial.indication || !Array.isArray(trial.indication)) {
+          indicationMatch = false;
+        } else {
+          indicationMatch = indications.some(ind => trial.indication.some(tind => tind.toLowerCase().includes(ind)));
         }
-        // Title match
-        const titleMatch = title === '' || (trial.title && trial.title.toLowerCase().includes(title));
-        // Phase match
-        const phaseMatch = phase === '' || trial.phase === phase;
-        // Status match
-        const statusMatch = status === '' || trial.status === status;
-
-        return trialIdMatch && otherStudyIdMatch && indicationMatch && titleMatch && phaseMatch && statusMatch;
-      });
-
-      const resultsContainer = document.getElementById('searchResults');
-      if (results.length === 0) {
-        resultsContainer.innerHTML = '<p class="text-gray-600 italic">No trials found matching the criteria.</p>';
-        return;
       }
-
-      let html = `<div class="overflow-x-auto">
-        <table class="min-w-full border border-gray-300 rounded-md">
-          <thead class="bg-blue-900 text-white">
-            <tr>
-              <th class="px-4 py-2 text-left">Trial ID</th>
-              <th class="px-4 py-2 text-left">Other Study ID(s)</th>
-              <th class="px-4 py-2 text-left">Title</th>
-              <th class="px-4 py-2 text-left">Indication(s)</th>
-              <th class="px-4 py-2 text-left">Enrollment</th>
-              <th class="px-4 py-2 text-left">Phase</th>
-              <th class="px-4 py-2 text-left">Study Type</th>
-              <th class="px-4 py-2 text-left">Status</th>
-              <th class="px-4 py-2 text-left">Sponsor</th>
-              <th class="px-4 py-2 text-left">Product Tags</th>
-              <th class="px-4 py-2 text-left">Allocation</th>
-              <th class="px-4 py-2 text-left">Start Date</th>
-              <th class="px-4 py-2 text-left">End Date</th>
-              <th class="px-4 py-2 text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody>`;
-
-      for (const trial of results) {
-        html += `<tr class="border-t border-gray-200 hover:bg-gray-100" tabindex="0" aria-label="View or edit trial ${trial.id}">
-          <td class="px-4 py-2">${trial.id}</td>
-          <td class="px-4 py-2">${trial.other_study_id && Array.isArray(trial.other_study_id) ? trial.other_study_id.join(', ') : ''}</td>
-          <td class="px-4 py-2">${trial.title}</td>
-          <td class="px-4 py-2">${trial.indication && Array.isArray(trial.indication) ? trial.indication.join(', ') : ''}</td>
-          <td class="px-4 py-2">${trial.enrollment !== null && trial.enrollment !== undefined ? trial.enrollment : ''}</td>
-          <td class="px-4 py-2">${trial.phase || ''}</td>
-          <td class="px-4 py-2">${trial.study_type || ''}</td>
-          <td class="px-4 py-2">${trial.status || ''}</td>
-          <td class="px-4 py-2">${trial.sponsor || ''}</td>
-          <td class="px-4 py-2">${trial.product_tags && trial.product_tags.length ? trial.product_tags.join(', ') : ''}</td>
-          <td class="px-4 py-2">${trial.allocation || ''}</td>
-          <td class="px-4 py-2">${trial.start_date || ''}</td>
-          <td class="px-4 py-2">${trial.end_date || ''}</td>
-          <td class="px-4 py-2">
-            <button data-trial-id="${trial.id}" class="view-edit-btn bg-blue-700 text-white px-3 py-1 rounded hover:bg-blue-600 transition text-sm">
-              <i class="fas fa-edit"></i> Edit
-            </button>
-          </td>
-        </tr>`;
-      }
-
-      html += `</tbody></table></div>`;
-
-      resultsContainer.innerHTML = html;
-
-      const editButtons = resultsContainer.querySelectorAll('.view-edit-btn');
-      editButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-          const trialId = btn.getAttribute('data-trial-id');
-          loadTrialDetails(trialId);
+      // Title match
+      const titleMatch = title === '' || (trial.title && trial.title.toLowerCase().includes(title));
+      // Phase match
+      const phaseMatch = phase === '' || trial.phase === phase;
+      // Status match
+      const statusMatch = status === '' || trial.status === status;
+      return trialIdMatch && otherStudyIdMatch && indicationMatch && titleMatch && phaseMatch && statusMatch;
+    });
+    if (results.length === 0) {
+      resultsContainer.innerHTML = '<p class="text-gray-600 italic">No trials found matching the criteria.</p>';
+      return;
+    }
+    let html = `<div class="overflow-x-auto">
+      <table class="min-w-full border border-gray-300 rounded-md">
+        <thead class="bg-blue-900 text-white">
+          <tr>
+            <th class="px-4 py-2 text-left">Trial ID</th>
+            <th class="px-4 py-2 text-left">Other Study ID(s)</th>
+            <th class="px-4 py-2 text-left">Title</th>
+            <th class="px-4 py-2 text-left">Indication(s)</th>
+            <th class="px-4 py-2 text-left">Enrollment</th>
+            <th class="px-4 py-2 text-left">Phase</th>
+            <th class="px-4 py-2 text-left">Study Type</th>
+            <th class="px-4 py-2 text-left">Status</th>
+            <th class="px-4 py-2 text-left">Sponsor</th>
+            <th class="px-4 py-2 text-left">Product Tags</th>
+            <th class="px-4 py-2 text-left">Allocation</th>
+            <th class="px-4 py-2 text-left">Start Date</th>
+            <th class="px-4 py-2 text-left">End Date</th>
+            <th class="px-4 py-2 text-left">Actions</th>
+          </tr>
+        </thead>
+        <tbody>`;
+    for (const trial of results) {
+      html += `<tr class="border-t border-gray-200 hover:bg-gray-100" tabindex="0" aria-label="View or edit trial ${trial.id}">
+        <td class="px-4 py-2">${trial.id}</td>
+        <td class="px-4 py-2">${trial.other_study_id && Array.isArray(trial.other_study_id) ? trial.other_study_id.join(', ') : ''}</td>
+        <td class="px-4 py-2">${trial.title}</td>
+        <td class="px-4 py-2">${trial.indication && Array.isArray(trial.indication) ? trial.indication.join(', ') : ''}</td>
+        <td class="px-4 py-2">${trial.enrollment !== null && trial.enrollment !== undefined ? trial.enrollment : ''}</td>
+        <td class="px-4 py-2">${trial.phase || ''}</td>
+        <td class="px-4 py-2">${trial.study_type || ''}</td>
+        <td class="px-4 py-2">${trial.status || ''}</td>
+        <td class="px-4 py-2">${trial.sponsor || ''}</td>
+        <td class="px-4 py-2">${trial.product_tags && trial.product_tags.length ? trial.product_tags.join(', ') : ''}</td>
+        <td class="px-4 py-2">${trial.allocation || ''}</td>
+        <td class="px-4 py-2">${trial.start_date || ''}</td>
+        <td class="px-4 py-2">${trial.end_date || ''}</td>
+        <td class="px-4 py-2">
+          <button data-trial-id="${trial.id}" class="view-edit-btn bg-blue-700 text-white px-3 py-1 rounded hover:bg-blue-600 transition text-sm">
+            <i class="fas fa-edit"></i> Edit
+          </button>
+        </td>
+      </tr>`;
+    }
+    html += `</tbody></table></div>`;
+    resultsContainer.innerHTML = html;
+    const editButtons = resultsContainer.querySelectorAll('.view-edit-btn');
+    editButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const trialId = btn.getAttribute('data-trial-id');
+        // Fetch the trial from Firestore and load details
+        db.collection('trials').doc(trialId).get().then(docSnapshot => {
+          if (!docSnapshot.exists) {
+            alert('Trial not found in Firestore.');
+            return;
+          }
+          const trial = docSnapshot.data();
+          loadTrialDetailsFromFirestore(trial);
           document.getElementById('trialDetailsSection').scrollIntoView({ behavior: 'smooth' });
+        }).catch(error => {
+          alert('Error loading trial from Firestore: ' + error.message);
         });
       });
     });
+  }).catch(error => {
+    resultsContainer.innerHTML = `<p class='text-red-600'>Error fetching trials from Firestore: ${error.message}</p>`;
+    console.error('[Firestore] Error fetching trials:', error);
+  });
+});
 
-    let currentTrialId = null;
 
-    function loadTrialDetails(trialId) {
-      const trial = trials.find(t => t.id === trialId);
-      if (!trial) return;
+let currentTrialId = null;
+// --- Edit Trial Logic ---
+// Allow editing and saving changes of existing trials back to Firestore
+function enableEditTrial() {
+  // Add an Edit button to the trial details section if not present
+  const detailsSection = document.getElementById('trialDetailsSection');
+  let editBtn = document.getElementById('editTrialBtn');
+  if (!editBtn) {
+    editBtn = document.createElement('button');
+    editBtn.id = 'editTrialBtn';
+    editBtn.className = 'bg-yellow-500 text-white font-semibold rounded px-4 py-2 hover:bg-yellow-600 transition ml-2';
+    editBtn.innerHTML = '<i class="fas fa-edit mr-2"></i>Edit Trial';
+    detailsSection.querySelector('.flex').appendChild(editBtn);
+  }
+  editBtn.onclick = showEditTrialForm;
+}
 
-      const detailsSection = document.getElementById('trialDetailsSection');
-      detailsSection.classList.remove('hidden');
-
-      const summary = `
-        <div><strong>Trial ID:</strong> ${trial.id}</div>
-        <div><strong>Other Study ID(s):</strong> ${trial.other_study_id && Array.isArray(trial.other_study_id) ? trial.other_study_id.join(', ') : 'N/A'}</div>
-        <div><strong>Title:</strong> ${trial.title}</div>
-        <div><strong>Indication(s):</strong> ${trial.indication && Array.isArray(trial.indication) ? trial.indication.join(', ') : 'N/A'}</div>
-        <div><strong>Enrollment:</strong> ${trial.enrollment !== null && trial.enrollment !== undefined ? trial.enrollment : 'N/A'}</div>
-        <div><strong>Phase:</strong> ${trial.phase || 'N/A'}</div>
-        <div><strong>Study Type:</strong> ${trial.study_type || 'N/A'}</div>
-        <div><strong>Status:</strong> ${trial.status || 'N/A'}</div>
-        <div><strong>Sponsor:</strong> ${trial.sponsor || 'N/A'}</div>
-        <div><strong>Product Tags:</strong> ${trial.product_tags && trial.product_tags.length ? trial.product_tags.join(', ') : 'N/A'}</div>
-        <div><strong>Allocation:</strong> ${trial.allocation || 'N/A'}</div>
-        <div><strong>Start Date:</strong> ${trial.start_date || 'N/A'}</div>
-        <div><strong>End Date:</strong> ${trial.end_date || 'N/A'}</div>
-        <div><strong>Created At:</strong> ${new Date(trial.created_at).toLocaleString()}</div>
-      `;
-      document.getElementById('trialSummary').innerHTML = summary;
-
-      currentTrialId = trialId;
-
-      const tabButtons = document.querySelectorAll('.tab-btn');
-      tabButtons.forEach(btn => {
-        btn.classList.remove('bg-gray-200', 'text-blue-900');
-        btn.classList.add('hover:bg-gray-100');
-      });
-      tabButtons[0].classList.add('bg-gray-200', 'text-blue-900');
-      loadTabContent('products');
-
-      resetAllTabForms();
+function showEditTrialForm() {
+  if (!currentTrialId) return;
+  // Fetch the latest trial data from Firestore
+  db.collection('trials').doc(currentTrialId).get().then(docSnapshot => {
+    if (!docSnapshot.exists) {
+      showMessage('addTrialMessage', 'Trial not found in Firestore.', true);
+      return;
     }
+    const trial = docSnapshot.data();
+    // Show a form pre-filled with trial data for editing
+    const detailsSection = document.getElementById('trialDetailsSection');
+    let html = `<form id="editTrialForm" class="bg-gray-50 p-4 rounded shadow-md grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto mt-4">
+      <h3 class="md:col-span-2 text-xl font-semibold text-blue-900 mb-2">Edit Trial</h3>
+      <div class="md:col-span-2">
+        <label class="block font-medium mb-1">Trial ID</label>
+        <input type="text" name="trial_id" value="${trial.id}" class="w-full border border-gray-300 rounded px-3 py-2 bg-gray-200" readonly />
+      </div>
+      <div class="md:col-span-2">
+        <label class="block font-medium mb-1">Other Study ID(s)</label>
+        <div id="editOtherStudyIdsContainer" class="space-y-2">${(trial.other_study_id||[]).map(osid => `<input type='text' name='other_study_id' value='${osid}' class='w-full border border-gray-300 rounded px-3 py-2' />`).join('') || `<input type='text' name='other_study_id' class='w-full border border-gray-300 rounded px-3 py-2' />`}</div>
+        <button type="button" id="addEditOtherStudyIdBtn" class="mt-2 text-blue-700 hover:underline text-sm flex items-center gap-1"><i class="fas fa-plus"></i> Add another Other Study ID</button>
+      </div>
+      <div class="md:col-span-2">
+        <label class="block font-medium mb-1">Indication(s)</label>
+        <div id="editIndicationsContainer" class="space-y-2">${(trial.indication||[]).map(ind => `<input type='text' name='indication' value='${ind}' class='w-full border border-gray-300 rounded px-3 py-2' />`).join('') || `<input type='text' name='indication' class='w-full border border-gray-300 rounded px-3 py-2' />`}</div>
+        <button type="button" id="addEditIndicationBtn" class="mt-2 text-blue-700 hover:underline text-sm flex items-center gap-1"><i class="fas fa-plus"></i> Add another Indication</button>
+      </div>
+      <div>
+        <label class="block font-medium mb-1">Title *</label>
+        <input type="text" name="title" value="${trial.title||''}" required class="w-full border border-gray-300 rounded px-3 py-2" />
+      </div>
+      <div>
+        <label class="block font-medium mb-1">Enrollment</label>
+        <input type="number" name="enrollment" value="${trial.enrollment||''}" min="0" class="w-full border border-gray-300 rounded px-3 py-2" />
+      </div>
+      <div>
+        <label class="block font-medium mb-1">Phase</label>
+        <input type="text" name="phase" value="${trial.phase||''}" class="w-full border border-gray-300 rounded px-3 py-2" />
+      </div>
+      <div>
+        <label class="block font-medium mb-1">Study Type</label>
+        <input type="text" name="study_type" value="${trial.study_type||''}" class="w-full border border-gray-300 rounded px-3 py-2" />
+      </div>
+      <div>
+        <label class="block font-medium mb-1">Status</label>
+        <input type="text" name="status" value="${trial.status||''}" class="w-full border border-gray-300 rounded px-3 py-2" />
+      </div>
+      <div>
+        <label class="block font-medium mb-1">Sponsor</label>
+        <input type="text" name="sponsor" value="${trial.sponsor||''}" class="w-full border border-gray-300 rounded px-3 py-2" />
+      </div>
+      <div class="md:col-span-2">
+        <label class="block font-medium mb-1">Product Tags</label>
+        <div id="editProductTagsContainer" class="space-y-2">${(trial.product_tags||[]).map(pt => `<input type='text' name='product_tag' value='${pt}' class='w-full border border-gray-300 rounded px-3 py-2' />`).join('') || `<input type='text' name='product_tag' class='w-full border border-gray-300 rounded px-3 py-2' />`}</div>
+        <button type="button" id="addEditProductTagBtn" class="mt-2 text-blue-700 hover:underline text-sm flex items-center gap-1"><i class="fas fa-plus"></i> Add another Product</button>
+      </div>
+      <div>
+        <label class="block font-medium mb-1">Allocation</label>
+        <input type="text" name="allocation" value="${trial.allocation||''}" class="w-full border border-gray-300 rounded px-3 py-2" />
+      </div>
+      <div>
+        <label class="block font-medium mb-1">Start Date</label>
+        <input type="date" name="start_date" value="${trial.start_date||''}" class="w-full border border-gray-300 rounded px-3 py-2" />
+      </div>
+      <div>
+        <label class="block font-medium mb-1">End Date</label>
+        <input type="date" name="end_date" value="${trial.end_date||''}" class="w-full border border-gray-300 rounded px-3 py-2" />
+      </div>
+      <div class="md:col-span-2 flex justify-end gap-4 mt-2">
+        <button type="button" id="cancelEditTrialBtn" class="bg-gray-400 text-white font-semibold rounded px-6 py-2 hover:bg-gray-500 transition">Cancel</button>
+        <button type="submit" class="bg-green-700 text-white font-semibold rounded px-6 py-2 hover:bg-green-600 transition"><i class='fas fa-save mr-2'></i>Save Changes</button>
+      </div>
+      <div id="editTrialMessage" class="md:col-span-2 text-sm mt-2"></div>
+    </form>`;
+    detailsSection.querySelector('#trialSummary').insertAdjacentHTML('afterend', html);
+    // Add dynamic input handlers
+    document.getElementById('addEditOtherStudyIdBtn').onclick = function() {
+      const c = document.getElementById('editOtherStudyIdsContainer');
+      const i = document.createElement('input');
+      i.type = 'text'; i.name = 'other_study_id'; i.className = 'w-full border border-gray-300 rounded px-3 py-2';
+      c.appendChild(i);
+    };
+    document.getElementById('addEditIndicationBtn').onclick = function() {
+      const c = document.getElementById('editIndicationsContainer');
+      const i = document.createElement('input');
+      i.type = 'text'; i.name = 'indication'; i.className = 'w-full border border-gray-300 rounded px-3 py-2';
+      c.appendChild(i);
+    };
+    document.getElementById('addEditProductTagBtn').onclick = function() {
+      const c = document.getElementById('editProductTagsContainer');
+      const i = document.createElement('input');
+      i.type = 'text'; i.name = 'product_tag'; i.className = 'w-full border border-gray-300 rounded px-3 py-2';
+      c.appendChild(i);
+    };
+    document.getElementById('cancelEditTrialBtn').onclick = function() {
+      document.getElementById('editTrialForm').remove();
+    };
+    document.getElementById('editTrialForm').onsubmit = function(e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+      const trial_id = formData.get('trial_id').trim();
+      const title = formData.get('title').trim();
+      if (!title) {
+        document.getElementById('editTrialMessage').textContent = 'Title is required.';
+        return;
+      }
+      // Collect multiple other_study_id inputs
+      const other_study_ids = [];
+      this.querySelectorAll('input[name="other_study_id"]').forEach(input => {
+        const val = input.value.trim();
+        if (val) other_study_ids.push(val);
+      });
+      // Collect multiple indications inputs
+      const indications = [];
+      this.querySelectorAll('input[name="indication"]').forEach(input => {
+        const val = input.value.trim();
+        if (val) indications.push(val);
+      });
+      const enrollmentRaw = formData.get('enrollment');
+      const enrollment = enrollmentRaw ? parseInt(enrollmentRaw) : null;
+      const phase = formData.get('phase');
+      const study_type = formData.get('study_type') || null;
+      const status = formData.get('status');
+      const sponsor = formData.get('sponsor').trim() || null;
+      // Collect multiple product_tag inputs
+      const product_tags = [];
+      this.querySelectorAll('input[name="product_tag"]').forEach(input => {
+        const val = input.value.trim();
+        if (val) product_tags.push(val);
+      });
+      const allocation = formData.get('allocation') || null;
+      const start_date = formData.get('start_date') || null;
+      const end_date = formData.get('end_date') || null;
+      const updatedTrial = {
+        id: trial_id,
+        title,
+        other_study_id: other_study_ids.length ? other_study_ids : null,
+        indication: indications.length ? indications : null,
+        enrollment,
+        phase: phase || null,
+        study_type,
+        status: status || null,
+        sponsor,
+        product_tags,
+        allocation,
+        start_date,
+        end_date,
+        created_at: trial.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      db.collection('trials').doc(trial_id).set(updatedTrial)
+        .then(() => {
+          document.getElementById('editTrialMessage').textContent = 'Trial updated successfully!';
+          setTimeout(() => {
+            document.getElementById('editTrialForm').remove();
+            loadTrialDetailsFromFirestore(updatedTrial);
+          }, 1000);
+        })
+        .catch(error => {
+          document.getElementById('editTrialMessage').textContent = 'Error updating trial: ' + error.message;
+        });
+    };
+  });
+}
+
+// Call enableEditTrial after loading trial details
+
+// Load trial details from Firestore result
+function loadTrialDetailsFromFirestore(trial) {
+  if (!trial) return;
+  const detailsSection = document.getElementById('trialDetailsSection');
+  detailsSection.classList.remove('hidden');
+  const summary = `
+    <div><strong>Trial ID:</strong> ${trial.id}</div>
+    <div><strong>Other Study ID(s):</strong> ${trial.other_study_id && Array.isArray(trial.other_study_id) ? trial.other_study_id.join(', ') : 'N/A'}</div>
+    <div><strong>Title:</strong> ${trial.title}</div>
+    <div><strong>Indication(s):</strong> ${trial.indication && Array.isArray(trial.indication) ? trial.indication.join(', ') : 'N/A'}</div>
+    <div><strong>Enrollment:</strong> ${trial.enrollment !== null && trial.enrollment !== undefined ? trial.enrollment : 'N/A'}</div>
+    <div><strong>Phase:</strong> ${trial.phase || 'N/A'}</div>
+    <div><strong>Study Type:</strong> ${trial.study_type || 'N/A'}</div>
+    <div><strong>Status:</strong> ${trial.status || 'N/A'}</div>
+    <div><strong>Sponsor:</strong> ${trial.sponsor || 'N/A'}</div>
+    <div><strong>Product Tags:</strong> ${trial.product_tags && trial.product_tags.length ? trial.product_tags.join(', ') : 'N/A'}</div>
+    <div><strong>Allocation:</strong> ${trial.allocation || 'N/A'}</div>
+    <div><strong>Start Date:</strong> ${trial.start_date || 'N/A'}</div>
+    <div><strong>End Date:</strong> ${trial.end_date || 'N/A'}</div>
+    <div><strong>Created At:</strong> ${trial.created_at ? new Date(trial.created_at).toLocaleString() : 'N/A'}</div>
+  `;
+  document.getElementById('trialSummary').innerHTML = summary;
+  currentTrialId = trial.id;
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  tabButtons.forEach(btn => {
+    btn.classList.remove('bg-gray-200', 'text-blue-900');
+    btn.classList.add('hover:bg-gray-100');
+  });
+  tabButtons[0].classList.add('bg-gray-200', 'text-blue-900');
+  loadTabContent('products');
+  resetAllTabForms();
+  enableEditTrial();
+}
+
+// For backward compatibility, keep the old function for localStorage
+function loadTrialDetails(trialId) {
+  let storedTrials = localStorage.getItem('trials');
+  let trialsArr = storedTrials ? JSON.parse(storedTrials) : trials;
+  const trial = trialsArr.find(t => t.id === trialId);
+  if (!trial) return;
+  loadTrialDetailsFromFirestore(trial);
+}
 
     document.getElementById('closeTrialDetailsBtn').addEventListener('click', () => {
       document.getElementById('trialDetailsSection').classList.add('hidden');
@@ -737,49 +991,58 @@
 
       let html = `
         <div class="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <h3 class="text-xl font-semibold text-blue-900">Products (ARM-wise)</h3>
+          <h3 class="text-xl font-semibold text-blue-900">ARM</h3>
           <button id="showAddProductFormBtn" class="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-600 transition text-sm flex items-center gap-2">
-            <i class="fas fa-plus"></i> Add Product
+            <i class="fas fa-plus"></i> Add ARM
           </button>
         </div>
       `;
 
-      if (trialProds.length === 0) {
-        html += `<p class="text-gray-600 italic mb-4">No products added yet.</p>`;
+      if (arms.length === 0) {
+        html += `<p class="text-gray-600 italic mb-4">No ARMs added yet.</p>`;
       } else {
-        html += `<div class="overflow-x-auto max-h-64 scrollbar-thin border border-gray-300 rounded">
-          <table class="min-w-full border-collapse border border-gray-300 text-sm">
-            <thead class="bg-blue-900 text-white">
-              <tr>
-                <th class="px-3 py-2 text-left">ARM</th>
-                <th class="px-3 py-2 text-left">Product Name</th>
-                <th class="px-3 py-2 text-left">Dose</th>
-                <th class="px-3 py-2 text-left">Dosage Details</th>
-                <th class="px-3 py-2 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${trialProds.map(tp => {
-                return `<tr class="border-t border-gray-200 hover:bg-gray-100">
-                  <td class="px-3 py-1">${tp.arm}</td>
-                  <td class="px-3 py-1">${tp.product_name || ''}</td>
-                  <td class="px-3 py-1">${tp.dose || ''}</td>
-                  <td class="px-3 py-1">${tp.dosage_details || ''}</td>
-                  <td class="px-3 py-1">
-                    <button data-tp-id="${tp.id}" class="edit-product-btn text-blue-700 hover:underline text-sm">Edit</button>
-                    <button data-tp-id="${tp.id}" class="remove-product-btn text-red-600 hover:underline text-sm ml-2">Remove</button>
-                  </td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>`;
+        // For each ARM, show a table of products for that ARM
+        arms.forEach(armName => {
+          const armProds = trialProds.filter(tp => tp.arm === armName);
+          html += `<div class="mb-6">
+            <h4 class="text-lg font-semibold text-blue-800 mb-2">${armName}</h4>`;
+          if (armProds.length === 0) {
+            html += `<p class="text-gray-600 italic mb-2">No products for this ARM.</p>`;
+          } else {
+            html += `<div class="overflow-x-auto max-h-48 scrollbar-thin border border-gray-300 rounded">
+              <table class="min-w-full border-collapse border border-gray-300 text-sm">
+                <thead class="bg-blue-900 text-white">
+                  <tr>
+                    <th class="px-3 py-2 text-left">Product Name</th>
+                    <th class="px-3 py-2 text-left">Dose</th>
+                    <th class="px-3 py-2 text-left">Dosage Details</th>
+                    <th class="px-3 py-2 text-left">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${armProds.map(tp => {
+                    return `<tr class="border-t border-gray-200 hover:bg-gray-100">
+                      <td class="px-3 py-1">${tp.product_name || ''}</td>
+                      <td class="px-3 py-1">${tp.dose || ''}</td>
+                      <td class="px-3 py-1">${tp.dosage_details || ''}</td>
+                      <td class="px-3 py-1">
+                        <button data-tp-id="${tp.id}" class="edit-product-btn text-blue-700 hover:underline text-sm">Edit</button>
+                        <button data-tp-id="${tp.id}" class="remove-product-btn text-red-600 hover:underline text-sm ml-2">Remove</button>
+                      </td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>`;
+          }
+          html += `</div>`;
+        });
       }
 
-      // Add Product Form (hidden initially)
+      // Add ARM/Product Form (hidden initially)
       html += `
         <form id="addProductForm" class="mt-6 bg-gray-50 p-4 rounded shadow-md max-w-4xl hidden grid grid-cols-1 md:grid-cols-2 gap-4" novalidate>
-          <h4 class="md:col-span-2 text-lg font-semibold text-blue-900">Add / Edit Product (ARM-wise)</h4>
+          <h4 class="md:col-span-2 text-lg font-semibold text-blue-900">Add / Edit Product to ARM</h4>
           <input type="hidden" id="productEditId" name="product_edit_id" value="" />
           <div>
             <label for="productArm" class="block font-medium mb-1">ARM *</label>
@@ -871,6 +1134,8 @@
             dose,
             dosage_details
           });
+          // Save to localStorage after adding
+          localStorage.setItem('trial_products', JSON.stringify(trial_products));
           showProductFormMessage('Product added successfully.');
         }
 
@@ -879,6 +1144,8 @@
           addReference(currentTrialId, 'products', source_name, reference_link);
         }
 
+        // Save to localStorage after editing as well
+        localStorage.setItem('trial_products', JSON.stringify(trial_products));
         loadTabContent('products');
       });
 
@@ -904,7 +1171,11 @@
         btn.addEventListener('click', () => {
           const tpId = parseInt(btn.getAttribute('data-tp-id'));
           const idx = trial_products.findIndex(tp => tp.id === tpId);
-          if (idx !== -1) trial_products.splice(idx, 1);
+          if (idx !== -1) {
+            trial_products.splice(idx, 1);
+            // Save to localStorage after removing
+            localStorage.setItem('trial_products', JSON.stringify(trial_products));
+          }
           loadTabContent('products');
         });
       });
@@ -920,6 +1191,32 @@
         el.textContent = msg;
         el.className = isError ? 'text-sm mt-2 text-red-600' : 'text-sm mt-2 text-green-600';
         if (msg) setTimeout(() => { el.textContent = ''; }, 4000);
+      }
+    }
+
+    // Load trial_products from localStorage on page load
+    const storedTrialProducts = localStorage.getItem('trial_products');
+    if (storedTrialProducts) {
+      try {
+        const parsed = JSON.parse(storedTrialProducts);
+        if (Array.isArray(parsed)) {
+          trial_products.push(...parsed);
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+
+    // Load trials from localStorage on page load
+    const storedTrials = localStorage.getItem('trials');
+    if (storedTrials) {
+      try {
+        const parsed = JSON.parse(storedTrials);
+        if (Array.isArray(parsed)) {
+          trials.push(...parsed);
+        }
+      } catch (e) {
+        // Ignore parse errors
       }
     }
 
