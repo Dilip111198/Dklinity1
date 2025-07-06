@@ -297,36 +297,36 @@
       const references = []; // unified references for all tabs
       const trial_products = [];
 
-      // === Firebase Config ===
-      // TODO: Replace with your own Firebase project config
-      const firebaseConfig = {
-        apiKey: "AIzaSyAbqH9HAqyhYQoKyXz98NiFeR5J4_MMrC8",
-        authDomain: "dklinity-e7007.firebaseapp.com",
-        projectId: "dklinity-e7007",
-        storageBucket: "dklinity-e7007.appspot.com",
-        messagingSenderId: "337796630433",
-        appId: "1:337796630433:web:7216fface5e385c3acade0",
-      };
-      // Initialize Firebase safely
-      let db = null;
-      try {
-        if (!firebase.apps.length) {
-          firebase.initializeApp(firebaseConfig);
-        }
-        db = firebase.firestore();
-      } catch (e) {
-        alert('Firebase failed to initialize. Please check your internet connection and Firebase configuration.');
-        console.error('Firebase initialization error:', e);
-        return;
-      }
+    // === Firebase Config ===
+    // TODO: Replace with your own Firebase project config
+    const firebaseConfig = {
+      apiKey: "AIzaSyAbqH9HAqyhYQoKyXz98NiFeR5J4_MMrC8",
+      authDomain: "dklinity-e7007.firebaseapp.com",
+      projectId: "dklinity-e7007",
+      storageBucket: "dklinity-e7007.appspot.com",
+      messagingSenderId: "337796630433",
+      appId: "1:337796630433:web:7216fface5e385c3acade0"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-      // --- Simple Login Logic (restored to original working version) ---
-      const loginOverlay = document.getElementById('loginOverlay');
-      const appContent = document.getElementById('appContent');
-      const loginForm = document.getElementById('loginForm');
-      const loginMessage = document.getElementById('loginMessage');
-      const USERNAME = 'Dilip';
-      const PASSWORD = 'Dilip@321';
+    // Login credentials
+    // Store login credentials in localStorage if not already present
+    const defaultUsername = 'Dilip';
+    const defaultPassword = 'Dilip@321';
+    if (!localStorage.getItem('validUsername') || !localStorage.getItem('validPassword')) {
+      localStorage.setItem('validUsername', defaultUsername);
+      localStorage.setItem('validPassword', defaultPassword);
+    }
+    const validUsername = localStorage.getItem('validUsername');
+    const validPassword = localStorage.getItem('validPassword');
+
+
+    // Show login overlay or app content based on login status
+    const loginOverlay = document.getElementById('loginOverlay');
+    const appContent = document.getElementById('appContent');
+    const loginForm = document.getElementById('loginForm');
+    const loginMessage = document.getElementById('loginMessage');
 
       // Show login overlay or app content based on login status
       if (localStorage.getItem('isLoggedIn') === 'true') {
