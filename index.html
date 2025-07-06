@@ -285,265 +285,275 @@
   </div>
 
   <script>
-    // In-memory data storage simulation
-    const trials = [];
-    const products = [];
-    const patients = [];
-    const adverseEvents = [];
-    const responseData = [];
-    const survivalData = [];
-    const regulatoryEvents = [];
-    const references = []; // unified references for all tabs
-    const trial_products = [];
+    document.addEventListener('DOMContentLoaded', async function() {
+      // In-memory data storage simulation
+      const trials = [];
+      const products = [];
+      const patients = [];
+      const adverseEvents = [];
+      const responseData = [];
+      const survivalData = [];
+      const regulatoryEvents = [];
+      const references = []; // unified references for all tabs
+      const trial_products = [];
 
-    // === Firebase Config ===
-    // TODO: Replace with your own Firebase project config
-    const firebaseConfig = {
-      apiKey: "AIzaSyAbqH9HAqyhYQoKyXz98NiFeR5J4_MMrC8",
-      authDomain: "dklinity-e7007.firebaseapp.com",
-      projectId: "dklinity-e7007",
-      storageBucket: "dklinity-e7007.appspot.com",
-      messagingSenderId: "337796630433",
-      appId: "1:337796630433:web:7216fface5e385c3acade0",
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+      // === Firebase Config ===
+      // TODO: Replace with your own Firebase project config
+      const firebaseConfig = {
+        apiKey: "AIzaSyAbqH9HAqyhYQoKyXz98NiFeR5J4_MMrC8",
+        authDomain: "dklinity-e7007.firebaseapp.com",
+        projectId: "dklinity-e7007",
+        storageBucket: "dklinity-e7007.appspot.com",
+        messagingSenderId: "337796630433",
+        appId: "1:337796630433:web:7216fface5e385c3acade0",
+      };
+      // Initialize Firebase safely
+      let db = null;
+      try {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
+        }
+        db = firebase.firestore();
+      } catch (e) {
+        alert('Firebase failed to initialize. Please check your internet connection and Firebase configuration.');
+        console.error('Firebase initialization error:', e);
+        return;
+      }
 
-    // Login credentials
-    // Store login credentials in localStorage if not already present
-    const defaultUsername = 'Dilip';
-    const defaultPassword = 'Dilip@321';
-    if (!localStorage.getItem('validUsername') || !localStorage.getItem('validPassword')) {
-      localStorage.setItem('validUsername', defaultUsername);
-      localStorage.setItem('validPassword', defaultPassword);
-    }
-    const validUsername = localStorage.getItem('validUsername');
-    const validPassword = localStorage.getItem('validPassword');
+      // --- Simple Login Logic (restored to original working version) ---
+      const loginOverlay = document.getElementById('loginOverlay');
+      const appContent = document.getElementById('appContent');
+      const loginForm = document.getElementById('loginForm');
+      const loginMessage = document.getElementById('loginMessage');
+      const USERNAME = 'Dilip';
+      const PASSWORD = 'Dilip@321';
 
-
-    // Show login overlay or app content based on login status
-    const loginOverlay = document.getElementById('loginOverlay');
-    const appContent = document.getElementById('appContent');
-    const loginForm = document.getElementById('loginForm');
-    const loginMessage = document.getElementById('loginMessage');
-
-    // Check login status on page load
-    if (localStorage.getItem('isLoggedIn') === 'true') {
-      loginOverlay.classList.add('hidden');
-      appContent.classList.remove('hidden');
-    } else {
-      loginOverlay.classList.remove('hidden');
-      appContent.classList.add('hidden');
-    }
-
-    loginForm.addEventListener('submit', e => {
-      e.preventDefault();
-      const username = loginForm.username.value.trim();
-      const password = loginForm.password.value;
-
-      if (username === validUsername && password === validPassword) {
-        localStorage.setItem('isLoggedIn', 'true');
+      // Show login overlay or app content based on login status
+      if (localStorage.getItem('isLoggedIn') === 'true') {
         loginOverlay.classList.add('hidden');
         appContent.classList.remove('hidden');
-        loginForm.reset();
-        loginMessage.textContent = '';
       } else {
-        loginMessage.textContent = 'Invalid username or password.';
+        loginOverlay.classList.remove('hidden');
+        appContent.classList.add('hidden');
       }
-    });
 
-    function generateId(collection) {
-      return collection.length ? collection[collection.length - 1].id + 1 : 1;
-    }
-
-    function showMessage(elementId, message, isError = false) {
-      const el = document.getElementById(elementId);
-      el.textContent = message;
-      el.className = isError ? 'mt-4 text-sm text-red-600' : 'mt-4 text-sm text-green-600';
-      setTimeout(() => {
-        el.textContent = '';
-      }, 5000);
-    }
-
-    // Add Other Study ID input fields dynamically (Add Trial Form)
-    const addOtherStudyIdBtn = document.getElementById('addOtherStudyIdBtn');
-    const addOtherStudyIdsContainer = document.getElementById('addOtherStudyIdsContainer');
-    addOtherStudyIdBtn.addEventListener('click', () => {
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.name = 'other_study_id';
-      input.placeholder = 'Other Study ID';
-      input.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
-      addOtherStudyIdsContainer.appendChild(input);
-    });
-
-    // Add Indication input fields dynamically (Add Trial Form)
-    const addIndicationBtn = document.getElementById('addIndicationBtn');
-    const addIndicationsContainer = document.getElementById('addIndicationsContainer');
-    addIndicationBtn.addEventListener('click', () => {
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.name = 'indication';
-      input.placeholder = 'Indication';
-      input.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
-      addIndicationsContainer.appendChild(input);
-    });
-
-    // Add Other Study ID input fields dynamically (Search Form)
-    const addSearchOtherStudyIdBtn = document.getElementById('addSearchOtherStudyIdBtn');
-    const searchOtherStudyIdsContainer = document.getElementById('searchOtherStudyIdsContainer');
-    addSearchOtherStudyIdBtn.addEventListener('click', () => {
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.name = 'other_study_id';
-      input.placeholder = 'Other Study ID';
-      input.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
-      searchOtherStudyIdsContainer.appendChild(input);
-    });
-
-    // Add Indication input fields dynamically (Search Form)
-    const addSearchIndicationBtn = document.getElementById('addSearchIndicationBtn');
-    const searchIndicationsContainer = document.getElementById('searchIndicationsContainer');
-    addSearchIndicationBtn.addEventListener('click', () => {
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.name = 'indication';
-      input.placeholder = 'Indication';
-      input.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
-      searchIndicationsContainer.appendChild(input);
-    });
-
-    // Add Product Tag input fields dynamically (Add Trial Form)
-    const addProductTagBtn = document.getElementById('addProductTagBtn');
-    const productTagsContainer = document.getElementById('productTagsContainer');
-    addProductTagBtn.addEventListener('click', () => {
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.name = 'product_tag';
-      input.placeholder = 'Product name';
-      input.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
-      productTagsContainer.appendChild(input);
-    });
-
-    // Add Trial Form Submission
-    document.getElementById('addTrialForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-      const formData = new FormData(this);
-      const trial_id = formData.get('trial_id').trim();
-      if (!trial_id) {
-        showMessage('addTrialMessage', 'Trial ID is required.', true);
-        return;
-      }
-      const title = formData.get('title').trim();
-      if (!title) {
-        showMessage('addTrialMessage', 'Title is required.', true);
-        return;
-      }
-      // Collect multiple other_study_id inputs
-      const other_study_ids = [];
-      this.querySelectorAll('input[name="other_study_id"]').forEach(input => {
-        const val = input.value.trim();
-        if (val) other_study_ids.push(val);
-      });
-      // Collect multiple indications inputs
-      const indications = [];
-      this.querySelectorAll('input[name="indication"]').forEach(input => {
-        const val = input.value.trim();
-        if (val) indications.push(val);
-      });
-      const enrollmentRaw = formData.get('enrollment');
-      const enrollment = enrollmentRaw ? parseInt(enrollmentRaw) : null;
-      const phase = formData.get('phase');
-      const study_type = formData.get('study_type') || null;
-      const status = formData.get('status');
-      const sponsor = formData.get('sponsor').trim() || null;
-      // Collect multiple product_tag inputs
-      const product_tags = [];
-      this.querySelectorAll('input[name="product_tag"]').forEach(input => {
-        const val = input.value.trim();
-        if (val) product_tags.push(val);
+      loginForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const username = loginForm.username.value.trim();
+        const password = loginForm.password.value;
+        if (username === USERNAME && password === PASSWORD) {
+          localStorage.setItem('isLoggedIn', 'true');
+          loginOverlay.classList.add('hidden');
+          appContent.classList.remove('hidden');
+          loginForm.reset();
+          loginMessage.textContent = '';
+        } else {
+          loginMessage.textContent = 'Invalid username or password.';
+        }
       });
 
-      const allocation = formData.get('allocation') || null;
-      const start_date = formData.get('start_date') || null;
-      const end_date = formData.get('end_date') || null;
+      function generateId(collection) {
+        return collection.length ? collection[collection.length - 1].id + 1 : 1;
+      }
 
-      const newTrial = {
-        id: trial_id,
-        title,
-        other_study_id: other_study_ids.length ? other_study_ids : null,
-        indication: indications.length ? indications : null,
-        enrollment,
-        phase: phase || null,
-        study_type,
-        status: status || null,
-        sponsor,
-        product_tags,
-        allocation,
-        start_date,
-        end_date,
-        created_at: new Date().toISOString()
-      };
+      function showMessage(elementId, message, isError = false) {
+        const el = document.getElementById(elementId);
+        el.textContent = message;
+        el.className = isError ? 'mt-4 text-sm text-red-600' : 'mt-4 text-sm text-green-600';
+        setTimeout(() => {
+          el.textContent = '';
+        }, 5000);
+      }
 
-      // Save to Firestore using trial_id as document ID for easier updates and duplicate prevention
-      console.log('[Firestore] Attempting to save trial:', newTrial);
-      db.collection('trials').doc(trial_id).get().then(docSnapshot => {
-        if (docSnapshot.exists) {
-          showMessage('addTrialMessage', `Trial ID "${trial_id}" already exists in Firestore. Please use a unique Trial ID.`, true);
+      // Add Other Study ID input fields dynamically (Add Trial Form)
+      const addOtherStudyIdBtn = document.getElementById('addOtherStudyIdBtn');
+      const addOtherStudyIdsContainer = document.getElementById('addOtherStudyIdsContainer');
+      addOtherStudyIdBtn.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.name = 'other_study_id';
+        input.placeholder = 'Other Study ID';
+        input.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
+        addOtherStudyIdsContainer.appendChild(input);
+      });
+
+      // Add Indication input fields dynamically (Add Trial Form)
+      const addIndicationBtn = document.getElementById('addIndicationBtn');
+      const addIndicationsContainer = document.getElementById('addIndicationsContainer');
+      addIndicationBtn.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.name = 'indication';
+        input.placeholder = 'Indication';
+        input.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
+        addIndicationsContainer.appendChild(input);
+      });
+
+      // Add Other Study ID input fields dynamically (Search Form)
+      const addSearchOtherStudyIdBtn = document.getElementById('addSearchOtherStudyIdBtn');
+      const searchOtherStudyIdsContainer = document.getElementById('searchOtherStudyIdsContainer');
+      addSearchOtherStudyIdBtn.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.name = 'other_study_id';
+        input.placeholder = 'Other Study ID';
+        input.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
+        searchOtherStudyIdsContainer.appendChild(input);
+      });
+
+      // Add Indication input fields dynamically (Search Form)
+      const addSearchIndicationBtn = document.getElementById('addSearchIndicationBtn');
+      const searchIndicationsContainer = document.getElementById('searchIndicationsContainer');
+      addSearchIndicationBtn.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.name = 'indication';
+        input.placeholder = 'Indication';
+        input.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
+        searchIndicationsContainer.appendChild(input);
+      });
+
+      // Add Product Tag input fields dynamically (Add Trial Form)
+      const addProductTagBtn = document.getElementById('addProductTagBtn');
+      const productTagsContainer = document.getElementById('productTagsContainer');
+      addProductTagBtn.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.name = 'product_tag';
+        input.placeholder = 'Product name';
+        input.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
+        productTagsContainer.appendChild(input);
+      });
+
+      // Add Trial Form Submission
+      document.getElementById('addTrialForm').addEventListener('submit', function (e) {
+        if (!db) {
+          showMessage('addTrialMessage', 'Database is not available. Please check your internet connection and reload.', true);
           return;
         }
-        db.collection('trials').doc(trial_id).set(newTrial)
-          .then(() => {
-            console.log('[Firestore] Trial saved successfully:', newTrial);
-            showMessage('addTrialMessage', `Trial ID "${newTrial.id}" added successfully to Firebase.`);
-            // Reset form
-            document.getElementById('addTrialForm').reset();
-            addOtherStudyIdsContainer.innerHTML = '';
-            const firstOtherStudyInput = document.createElement('input');
-            firstOtherStudyInput.type = 'text';
-            firstOtherStudyInput.name = 'other_study_id';
-            firstOtherStudyInput.placeholder = 'Other Study ID';
-            firstOtherStudyInput.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
-            addOtherStudyIdsContainer.appendChild(firstOtherStudyInput);
-            addIndicationsContainer.innerHTML = '';
-            const firstIndicationInput = document.createElement('input');
-            firstIndicationInput.type = 'text';
-            firstIndicationInput.name = 'indication';
-            firstIndicationInput.placeholder = 'Indication';
-            firstIndicationInput.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
-            addIndicationsContainer.appendChild(firstIndicationInput);
-            productTagsContainer.innerHTML = '';
-            const firstProductTagInput = document.createElement('input');
-            firstProductTagInput.type = 'text';
-            firstProductTagInput.name = 'product_tag';
-            firstProductTagInput.placeholder = 'Product name';
-            firstProductTagInput.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
-            productTagsContainer.appendChild(firstProductTagInput);
-            // Show details
-            loadTrialDetailsFromFirestore(newTrial);
-            document.getElementById('trialDetailsSection').scrollIntoView({ behavior: 'smooth' });
-            // --- Refresh search results if visible ---
-            const searchSection = document.getElementById('search');
-            if (searchSection && !searchSection.classList.contains('hidden')) {
-              // Simulate a search submit to refresh results
-              const searchForm = document.getElementById('trialSearchForm');
-              if (searchForm) {
-                searchForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        e.preventDefault();
+        const formData = new FormData(this);
+        const trial_id = formData.get('trial_id').trim();
+        if (!trial_id) {
+          showMessage('addTrialMessage', 'Trial ID is required.', true);
+          return;
+        }
+        const title = formData.get('title').trim();
+        if (!title) {
+          showMessage('addTrialMessage', 'Title is required.', true);
+          return;
+        }
+        // Collect multiple other_study_id inputs
+        const other_study_ids = [];
+        this.querySelectorAll('input[name="other_study_id"]').forEach(input => {
+          const val = input.value.trim();
+          if (val) other_study_ids.push(val);
+        });
+        // Collect multiple indications inputs
+        const indications = [];
+        this.querySelectorAll('input[name="indication"]').forEach(input => {
+          const val = input.value.trim();
+          if (val) indications.push(val);
+        });
+        const enrollmentRaw = formData.get('enrollment');
+        const enrollment = enrollmentRaw ? parseInt(enrollmentRaw) : null;
+        const phase = formData.get('phase');
+        const study_type = formData.get('study_type') || null;
+        const status = formData.get('status');
+        const sponsor = formData.get('sponsor').trim() || null;
+        // Collect multiple product_tag inputs
+        const product_tags = [];
+        this.querySelectorAll('input[name="product_tag"]').forEach(input => {
+          const val = input.value.trim();
+          if (val) product_tags.push(val);
+        });
+
+        const allocation = formData.get('allocation') || null;
+        const start_date = formData.get('start_date') || null;
+        const end_date = formData.get('end_date') || null;
+
+        const newTrial = {
+          id: trial_id,
+          title,
+          other_study_id: other_study_ids.length ? other_study_ids : null,
+          indication: indications.length ? indications : null,
+          enrollment,
+          phase: phase || null,
+          study_type,
+          status: status || null,
+          sponsor,
+          product_tags,
+          allocation,
+          start_date,
+          end_date,
+          created_at: new Date().toISOString()
+        };
+
+        // Save to Firestore using trial_id as document ID for easier updates and duplicate prevention
+        console.log('[Firestore] Attempting to save trial:', newTrial);
+        db.collection('trials').doc(trial_id).get().then(docSnapshot => {
+          if (docSnapshot.exists) {
+            showMessage('addTrialMessage', `Trial ID "${trial_id}" already exists in Firestore. Please use a unique Trial ID.`, true);
+            return;
+          }
+          db.collection('trials').doc(trial_id).set(newTrial)
+            .then(() => {
+              console.log('[Firestore] Trial saved successfully:', newTrial);
+              showMessage('addTrialMessage', `Trial ID "${newTrial.id}" added successfully to Firebase.`);
+              // Reset form
+              document.getElementById('addTrialForm').reset();
+              addOtherStudyIdsContainer.innerHTML = '';
+              const firstOtherStudyInput = document.createElement('input');
+              firstOtherStudyInput.type = 'text';
+              firstOtherStudyInput.name = 'other_study_id';
+              firstOtherStudyInput.placeholder = 'Other Study ID';
+              firstOtherStudyInput.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
+              addOtherStudyIdsContainer.appendChild(firstOtherStudyInput);
+              addIndicationsContainer.innerHTML = '';
+              const firstIndicationInput = document.createElement('input');
+              firstIndicationInput.type = 'text';
+              firstIndicationInput.name = 'indication';
+              firstIndicationInput.placeholder = 'Indication';
+              firstIndicationInput.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
+              addIndicationsContainer.appendChild(firstIndicationInput);
+              productTagsContainer.innerHTML = '';
+              const firstProductTagInput = document.createElement('input');
+              firstProductTagInput.type = 'text';
+              firstProductTagInput.name = 'product_tag';
+              firstProductTagInput.placeholder = 'Product name';
+              firstProductTagInput.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
+              productTagsContainer.appendChild(firstProductTagInput);
+              // Show details
+              loadTrialDetailsFromFirestore(newTrial);
+              document.getElementById('trialDetailsSection').scrollIntoView({ behavior: 'smooth' });
+              // --- Refresh search results if visible ---
+              const searchSection = document.getElementById('search');
+              if (searchSection && !searchSection.classList.contains('hidden')) {
+                // Simulate a search submit to refresh results
+                const searchForm = document.getElementById('trialSearchForm');
+                if (searchForm) {
+                  searchForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                }
               }
-            }
-          })
-          .catch((error) => {
-            console.error('[Firestore] Error saving trial:', error);
-            showMessage('addTrialMessage', `Error saving to Firebase: ${error.message}`, true);
-          });
-      }).catch((error) => {
-        console.error('[Firestore] Error checking for duplicate:', error);
-        showMessage('addTrialMessage', `Error checking for duplicate: ${error.message}`, true);
+            })
+            .catch((error) => {
+              console.error('[Firestore] Error saving trial:', error);
+              showMessage('addTrialMessage', `Error saving to Firebase: ${error.message}`, true);
+            });
+        }).catch((error) => {
+          console.error('[Firestore] Error checking for duplicate:', error);
+          showMessage('addTrialMessage', `Error checking for duplicate: ${error.message}`, true);
+        });
       });
     });
 
     // Search Trials
 document.getElementById('trialSearchForm').addEventListener('submit', function (e) {
+  if (!db) {
+    const resultsContainer = document.getElementById('searchResults');
+    resultsContainer.innerHTML = '<p class="text-red-600">Database is not available. Please check your internet connection and reload.</p>';
+    return;
+  }
   e.preventDefault();
   const formData = new FormData(this);
   const trialId = formData.get('trial_id').trim().toLowerCase();
@@ -963,6 +973,11 @@ function loadTrialDetails(trialId) {
       });
     }
 
+    // --- ARM Tab (Products) ---
+    function renderProductsTab(container, trialId) {
+      container.innerHTML = '<p class="text-gray-600 italic">ARM tab content not implemented yet.</p>';
+    }
+
     // Load tab content dispatcher
     function loadTabContent(tab) {
       if (!currentTrialId) return;
@@ -981,294 +996,208 @@ function loadTrialDetails(trialId) {
       }
     }
 
-    // === PRODUCTS TAB ===
-    // ARM wise product addition with dose and dosage details
-    // Product Name is free text input to allow pasting or typing product names
-    function renderProductsTab(container, trialId) {
+    // === PATIENTS (ARM-wise) TAB ===
+    // Each ARM can have multiple patient details, each with rich text (table-formattable), source, and reference link
+    function renderPatientsTab(container, trialId) {
       const arms = getArms(trialId);
-      // Products linked to trial with arm info
-      const trialProds = trial_products.filter(tp => tp.trial_id === trialId);
-
-      let html = `
-        <div class="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <h3 class="text-xl font-semibold text-blue-900">ARM</h3>
-          <button id="showAddProductFormBtn" class="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-600 transition text-sm flex items-center gap-2">
-            <i class="fas fa-plus"></i> Add ARM
-          </button>
-        </div>
-      `;
-
-      if (arms.length === 0) {
-        html += `<p class="text-gray-600 italic mb-4">No ARMs added yet.</p>`;
-      } else {
-        // For each ARM, show a table of products for that ARM
-        arms.forEach(armName => {
-          const armProds = trialProds.filter(tp => tp.arm === armName);
-          html += `<div class="mb-6">
-            <h4 class="text-lg font-semibold text-blue-800 mb-2">${armName}</h4>`;
-          if (armProds.length === 0) {
-            html += `<p class="text-gray-600 italic mb-2">No products for this ARM.</p>`;
-          } else {
-            html += `<div class="overflow-x-auto max-h-48 scrollbar-thin border border-gray-300 rounded">
-              <table class="min-w-full border-collapse border border-gray-300 text-sm">
-                <thead class="bg-blue-900 text-white">
-                  <tr>
-                    <th class="px-3 py-2 text-left">Product Name</th>
-                    <th class="px-3 py-2 text-left">Dose</th>
-                    <th class="px-3 py-2 text-left">Dosage Details</th>
-                    <th class="px-3 py-2 text-left">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${armProds.map(tp => {
-                    return `<tr class="border-t border-gray-200 hover:bg-gray-100">
-                      <td class="px-3 py-1">${tp.product_name || ''}</td>
-                      <td class="px-3 py-1">${tp.dose || ''}</td>
-                      <td class="px-3 py-1">${tp.dosage_details || ''}</td>
-                      <td class="px-3 py-1">
-                        <button data-tp-id="${tp.id}" class="edit-product-btn text-blue-700 hover:underline text-sm">Edit</button>
-                        <button data-tp-id="${tp.id}" class="remove-product-btn text-red-600 hover:underline text-sm ml-2">Remove</button>
-                      </td>
-                    </tr>`;
-                  }).join('')}
-                </tbody>
-              </table>
-            </div>`;
-          }
-          html += `</div>`;
+      db.collection('trial_patients').where('trial_id', '==', trialId).get().then(querySnapshot => {
+        const trialPatients = [];
+        querySnapshot.forEach(doc => {
+          const data = doc.data();
+          data._docId = doc.id;
+          trialPatients.push(data);
         });
-      }
-
-      // Add ARM/Product Form (hidden initially)
-      html += `
-        <form id="addProductForm" class="mt-6 bg-gray-50 p-4 rounded shadow-md max-w-4xl hidden grid grid-cols-1 md:grid-cols-2 gap-4" novalidate>
-          <h4 class="md:col-span-2 text-lg font-semibold text-blue-900">Add / Edit Product to ARM</h4>
-          <input type="hidden" id="productEditId" name="product_edit_id" value="" />
-          <div>
-            <label for="productArm" class="block font-medium mb-1">ARM *</label>
-            <input type="text" id="productArm" name="arm" placeholder="e.g. ARM 1" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" list="armsList" required />
-            <datalist id="armsList">${arms.map(a => `<option value="${a}"></option>`).join('')}</datalist>
-          </div>
-          <div>
-            <label for="productName" class="block font-medium mb-1">Product Name *</label>
-            <input type="text" id="productName" name="product_name" placeholder="Product name (free text)" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" required />
-          </div>
-          <div>
-            <label for="productDose" class="block font-medium mb-1">Dose</label>
-            <input type="text" id="productDose" name="dose" placeholder="Dose" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" />
-          </div>
-          <div>
-            <label for="productDosageDetails" class="block font-medium mb-1">Dosage Details</label>
-            <textarea id="productDosageDetails" name="dosage_details" rows="3" placeholder="Dosage details" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600 resize-y"></textarea>
-          </div>
-          <div class="md:col-span-2">
-            <label for="productSourceName" class="block font-medium mb-1">Reference Source Name</label>
-            <input type="text" id="productSourceName" name="source_name" placeholder="Source name" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" />
-          </div>
-          <div class="md:col-span-2">
-            <label for="productReferenceLink" class="block font-medium mb-1">Reference Link</label>
-            <input type="url" id="productReferenceLink" name="reference_link" placeholder="https://example.com" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" />
-          </div>
-          <div class="md:col-span-2 flex justify-end gap-4">
-            <button type="button" id="cancelProductBtn" class="bg-gray-400 text-white font-semibold rounded px-6 py-2 hover:bg-gray-500 transition">Cancel</button>
-            <button type="submit" class="bg-green-700 text-white font-semibold rounded px-6 py-2 hover:bg-green-600 transition">
-              <i class="fas fa-save mr-2"></i> Save Product
+        let html = `
+          <div class="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <h3 class="text-xl font-semibold text-blue-900">Patients (ARM-wise)</h3>
+            <button id="showAddPatientFormBtn" class="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-600 transition text-sm flex items-center gap-2">
+              <i class="fas fa-plus"></i> Add Patient Detail
             </button>
           </div>
-          <div id="productFormMessage" class="md:col-span-2 text-sm mt-2"></div>
-        </form>
-      `;
-
-      container.innerHTML = html;
-
-      // Event handlers
-      document.getElementById('showAddProductFormBtn').addEventListener('click', () => {
-        resetProductForm();
-        document.getElementById('addProductForm').classList.remove('hidden');
-        document.getElementById('productArm').focus();
-      });
-
-      document.getElementById('cancelProductBtn').addEventListener('click', () => {
-        resetProductForm();
-        document.getElementById('addProductForm').classList.add('hidden');
-      });
-
-      document.getElementById('addProductForm').addEventListener('submit', e => {
-        e.preventDefault();
-        const form = e.target;
-        const editId = form.product_edit_id.value;
-        const arm = form.arm.value.trim();
-        const product_name = form.product_name.value.trim();
-        if (!arm || !product_name) {
-          showProductFormMessage('ARM and Product Name are required.', true);
-          return;
+        `;
+        if (arms.length === 0) {
+          html += `<p class="text-gray-600 italic mb-4">No ARMs added yet. Add ARMs in the ARM tab first.</p>`;
+        } else {
+          arms.forEach(armName => {
+            const armPatients = trialPatients.filter(tp => tp.arm === armName);
+            html += `<div class="mb-6">
+              <h4 class="text-lg font-semibold text-blue-800 mb-2">${armName}</h4>`;
+            if (armPatients.length === 0) {
+              html += `<p class="text-gray-600 italic mb-2">No patient details for this ARM.</p>`;
+            } else {
+              html += `<div class="overflow-x-auto max-h-64 scrollbar-thin border border-gray-300 rounded">
+                <table class="min-w-full border-collapse border border-gray-300 text-sm">
+                  <thead class="bg-blue-900 text-white">
+                    <tr>
+                      <th class="px-3 py-2 text-left">Patient Details (Rich Text)</th>
+                      <th class="px-3 py-2 text-left">Source</th>
+                      <th class="px-3 py-2 text-left">Reference Link</th>
+                      <th class="px-3 py-2 text-left">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${armPatients.map(tp => {
+                      return `<tr class="border-t border-gray-200 hover:bg-gray-100">
+                        <td class="px-3 py-1"><div class="prose prose-sm max-w-none">${tp.patient_text || ''}</div></td>
+                        <td class="px-3 py-1">${tp.source_name || ''}</td>
+                        <td class="px-3 py-1">${tp.reference_link ? `<a href="${tp.reference_link}" target="_blank" class="text-blue-700 underline">Link</a>` : ''}</td>
+                        <td class="px-3 py-1">
+                          <button data-doc-id="${tp._docId}" class="edit-patient-btn text-blue-700 hover:underline text-sm">Edit</button>
+                          <button data-doc-id="${tp._docId}" class="remove-patient-btn text-red-600 hover:underline text-sm ml-2">Remove</button>
+                        </td>
+                      </tr>`;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>`;
+            }
+            html += `</div>`;
+          });
         }
-        const dose = form.dose.value.trim() || null;
-        const dosage_details = form.dosage_details.value.trim() || null;
-        const source_name = form.source_name.value.trim() || null;
-        const reference_link = form.reference_link.value.trim() || null;
 
-        // Add arm if new
-        addArm(currentTrialId, arm);
+        // Add Patient Form (hidden initially)
+        html += `
+          <form id="addPatientForm" class="mt-6 bg-gray-50 p-4 rounded shadow-md max-w-4xl hidden grid grid-cols-1 md:grid-cols-2 gap-4" novalidate>
+            <h4 class="md:col-span-2 text-lg font-semibold text-blue-900">Add / Edit Patient Detail</h4>
+            <input type="hidden" id="patientEditId" name="patient_edit_id" value="" />
+            <div>
+              <label for="patientArm" class="block font-medium mb-1">ARM *</label>
+              <input type="text" id="patientArm" name="arm" placeholder="e.g. ARM 1" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" list="armsListPatients" required />
+              <datalist id="armsListPatients">${arms.map(a => `<option value="${a}"></option>`).join('')}</datalist>
+            </div>
+            <div class="md:col-span-2">
+              <label for="patientText" class="block font-medium mb-1">Patient Details (Rich Text, supports tables)</label>
+              <div id="patientText" name="patient_text" class="editable-table w-full min-h-[100px] border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white" contenteditable="true" style="white-space:pre-wrap;" placeholder="Enter patient details. Use toolbar for formatting."></div>
+              <div class="mt-2 flex gap-2">
+                <button type="button" class="format-btn border px-2 py-1 rounded text-xs" data-cmd="bold"><b>B</b></button>
+                <button type="button" class="format-btn border px-2 py-1 rounded text-xs" data-cmd="italic"><i>I</i></button>
+                <button type="button" class="format-btn border px-2 py-1 rounded text-xs" data-cmd="insertUnorderedList">&#8226; List</button>
+                <button type="button" class="format-btn border px-2 py-1 rounded text-xs" data-cmd="insertTable">Table</button>
+              </div>
+            </div>
+            <div>
+              <label for="patientSourceName" class="block font-medium mb-1">Source</label>
+              <input type="text" id="patientSourceName" name="source_name" placeholder="Source name" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" />
+            </div>
+            <div>
+              <label for="patientReferenceLink" class="block font-medium mb-1">Reference Link</label>
+              <input type="url" id="patientReferenceLink" name="reference_link" placeholder="https://example.com" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" />
+            </div>
+            <div class="md:col-span-2 flex justify-end gap-4">
+              <button type="button" id="cancelPatientBtn" class="bg-gray-400 text-white font-semibold rounded px-6 py-2 hover:bg-gray-500 transition">Cancel</button>
+              <button type="submit" class="bg-green-700 text-white font-semibold rounded px-6 py-2 hover:bg-green-600 transition">
+                <i class="fas fa-save mr-2"></i> Save Patient Detail
+              </button>
+            </div>
+            <div id="patientFormMessage" class="md:col-span-2 text-sm mt-2"></div>
+          </form>
+        `;
 
-        if (editId) {
-          // Edit existing trial_product entry
-          const tpId = parseInt(editId);
-          const tpIndex = trial_products.findIndex(tp => tp.id === tpId);
-          if (tpIndex === -1) {
-            showProductFormMessage('Product entry not found.', true);
+        container.innerHTML = html;
+
+        // Formatting toolbar handlers
+        container.querySelectorAll('.format-btn').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const cmd = btn.getAttribute('data-cmd');
+            if (cmd === 'insertTable') {
+              // Insert a 2x2 table at caret
+              document.execCommand('insertHTML', false, '<table border="1" style="border-collapse:collapse;width:100%"><tr><td>&nbsp;</td><td>&nbsp;</td></tr><tr><td>&nbsp;</td><td>&nbsp;</td></tr></table>');
+            } else {
+              document.execCommand(cmd, false, null);
+            }
+          });
+        });
+
+        // Show form
+        document.getElementById('showAddPatientFormBtn').addEventListener('click', () => {
+          resetPatientForm();
+          document.getElementById('addPatientForm').classList.remove('hidden');
+          document.getElementById('patientArm').focus();
+        });
+
+        document.getElementById('cancelPatientBtn').addEventListener('click', () => {
+          resetPatientForm();
+          document.getElementById('addPatientForm').classList.add('hidden');
+        });
+
+        document.getElementById('addPatientForm').addEventListener('submit', e => {
+          e.preventDefault();
+          const form = e.target;
+          const arm = form.arm.value.trim();
+          const patient_text = document.getElementById('patientText').innerHTML.trim();
+          if (!arm || !patient_text) {
+            showPatientFormMessage('ARM and Patient Details are required.', true);
             return;
           }
-          trial_products[tpIndex].arm = arm;
-          trial_products[tpIndex].product_name = product_name;
-          trial_products[tpIndex].dose = dose;
-          trial_products[tpIndex].dosage_details = dosage_details;
-          showProductFormMessage('Product updated successfully.');
-        } else {
-          // Add new trial_product entry
-          trial_products.push({
-            id: generateId(trial_products),
+          const source_name = form.source_name.value.trim() || null;
+          const reference_link = form.reference_link.value.trim() || null;
+          // Add arm if new
+          addArm(currentTrialId, arm);
+          // Save to Firestore
+          const editId = form.patient_edit_id.value;
+          const data = {
             trial_id: currentTrialId,
             arm,
-            product_name,
-            dose,
-            dosage_details
-          });
-          // Save to localStorage after adding
-          localStorage.setItem('trial_products', JSON.stringify(trial_products));
-          showProductFormMessage('Product added successfully.');
-        }
-
-        // Add reference if provided
-        if (source_name && reference_link) {
-          addReference(currentTrialId, 'products', source_name, reference_link);
-        }
-
-        // Save to localStorage after editing as well
-        localStorage.setItem('trial_products', JSON.stringify(trial_products));
-        loadTabContent('products');
-      });
-
-      container.querySelectorAll('.edit-product-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const tpId = parseInt(btn.getAttribute('data-tp-id'));
-          const tp = trial_products.find(t => t.id === tpId);
-          if (!tp) return;
-          const form = document.getElementById('addProductForm');
-          form.product_edit_id.value = tp.id;
-          form.arm.value = tp.arm;
-          form.product_name.value = tp.product_name || '';
-          form.dose.value = tp.dose || '';
-          form.dosage_details.value = tp.dosage_details || '';
-          form.source_name.value = '';
-          form.reference_link.value = '';
-          document.getElementById('addProductForm').classList.remove('hidden');
-          form.arm.focus();
-        });
-      });
-
-      container.querySelectorAll('.remove-product-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const tpId = parseInt(btn.getAttribute('data-tp-id'));
-          const idx = trial_products.findIndex(tp => tp.id === tpId);
-          if (idx !== -1) {
-            trial_products.splice(idx, 1);
-            // Save to localStorage after removing
-            localStorage.setItem('trial_products', JSON.stringify(trial_products));
+            patient_text,
+            source_name,
+            reference_link
+          };
+          if (editId) {
+            db.collection('trial_patients').doc(editId).set(data).then(() => {
+              showPatientFormMessage('Patient detail updated successfully.');
+              loadTabContent('patients');
+            }).catch(error => {
+              showPatientFormMessage('Error updating patient detail: ' + error.message, true);
+            });
+          } else {
+            db.collection('trial_patients').add(data).then(() => {
+              showPatientFormMessage('Patient detail added successfully.');
+              loadTabContent('patients');
+            }).catch(error => {
+              showPatientFormMessage('Error saving patient detail: ' + error.message, true);
+            });
           }
-          loadTabContent('products');
         });
+
+        container.querySelectorAll('.edit-patient-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const docId = btn.getAttribute('data-doc-id');
+            db.collection('trial_patients').doc(docId).get().then(docSnapshot => {
+              if (!docSnapshot.exists) return;
+              const tp = docSnapshot.data();
+              const form = document.getElementById('addPatientForm');
+              form.patient_edit_id.value = docId;
+              form.arm.value = tp.arm;
+              document.getElementById('patientText').innerHTML = tp.patient_text || '';
+              form.source_name.value = tp.source_name || '';
+              form.reference_link.value = tp.reference_link || '';
+              document.getElementById('addPatientForm').classList.remove('hidden');
+              form.arm.focus();
+            });
+          });
+        });
+
+        container.querySelectorAll('.remove-patient-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const docId = btn.getAttribute('data-doc-id');
+            db.collection('trial_patients').doc(docId).delete().then(() => {
+              loadTabContent('patients');
+            });
+          });
+        });
+
+        function resetPatientForm() {
+          const form = document.getElementById('addPatientForm');
+          form.reset();
+          form.patient_edit_id.value = '';
+          document.getElementById('patientText').innerHTML = '';
+          showPatientFormMessage('');
+        }
+        function showPatientFormMessage(msg, isError = false) {
+          const el = document.getElementById('patientFormMessage');
+          el.textContent = msg;
+          el.className = isError ? 'text-sm mt-2 text-red-600' : 'text-sm mt-2 text-green-600';
+          if (msg) setTimeout(() => { el.textContent = ''; }, 4000);
+        }
       });
-
-      function resetProductForm() {
-        const form = document.getElementById('addProductForm');
-        form.reset();
-        form.product_edit_id.value = '';
-        showProductFormMessage('');
-      }
-      function showProductFormMessage(msg, isError = false) {
-        const el = document.getElementById('productFormMessage');
-        el.textContent = msg;
-        el.className = isError ? 'text-sm mt-2 text-red-600' : 'text-sm mt-2 text-green-600';
-        if (msg) setTimeout(() => { el.textContent = ''; }, 4000);
-      }
     }
-
-    // Load trial_products from localStorage on page load
-    const storedTrialProducts = localStorage.getItem('trial_products');
-    if (storedTrialProducts) {
-      try {
-        const parsed = JSON.parse(storedTrialProducts);
-        if (Array.isArray(parsed)) {
-          trial_products.push(...parsed);
-        }
-      } catch (e) {
-        // Ignore parse errors
-      }
-    }
-
-    // Load trials from localStorage on page load
-    const storedTrials = localStorage.getItem('trials');
-    if (storedTrials) {
-      try {
-        const parsed = JSON.parse(storedTrials);
-        if (Array.isArray(parsed)) {
-          trials.push(...parsed);
-        }
-      } catch (e) {
-        // Ignore parse errors
-      }
-    }
-
-    // Initialize dynamic inputs on page load
-    window.addEventListener('load', () => {
-      // Initialize add trial form dynamic inputs with one input each
-      const addOtherStudyIdsContainer = document.getElementById('addOtherStudyIdsContainer');
-      addOtherStudyIdsContainer.innerHTML = '';
-      const firstOtherStudyInput = document.createElement('input');
-      firstOtherStudyInput.type = 'text';
-      firstOtherStudyInput.name = 'other_study_id';
-      firstOtherStudyInput.placeholder = 'Other Study ID';
-      firstOtherStudyInput.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
-      addOtherStudyIdsContainer.appendChild(firstOtherStudyInput);
-
-      const addIndicationsContainer = document.getElementById('addIndicationsContainer');
-      addIndicationsContainer.innerHTML = '';
-      const firstIndicationInput = document.createElement('input');
-      firstIndicationInput.type = 'text';
-      firstIndicationInput.name = 'indication';
-      firstIndicationInput.placeholder = 'Indication';
-      firstIndicationInput.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
-      addIndicationsContainer.appendChild(firstIndicationInput);
-
-      const productTagsContainer = document.getElementById('productTagsContainer');
-      productTagsContainer.innerHTML = '';
-      const firstProductTagInput = document.createElement('input');
-      firstProductTagInput.type = 'text';
-      firstProductTagInput.name = 'product_tag';
-      firstProductTagInput.placeholder = 'Product name';
-      firstProductTagInput.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
-      productTagsContainer.appendChild(firstProductTagInput);
-
-      // Initialize search form dynamic inputs with one input each
-      const searchOtherStudyIdsContainer = document.getElementById('searchOtherStudyIdsContainer');
-      searchOtherStudyIdsContainer.innerHTML = '';
-      const firstSearchOtherStudyInput = document.createElement('input');
-      firstSearchOtherStudyInput.type = 'text';
-      firstSearchOtherStudyInput.name = 'other_study_id';
-      firstSearchOtherStudyInput.placeholder = 'Other Study ID';
-      firstSearchOtherStudyInput.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
-      searchOtherStudyIdsContainer.appendChild(firstSearchOtherStudyInput);
-
-      const searchIndicationsContainer = document.getElementById('searchIndicationsContainer');
-      searchIndicationsContainer.innerHTML = '';
-      const firstSearchIndicationInput = document.createElement('input');
-      firstSearchIndicationInput.type = 'text';
-      firstSearchIndicationInput.name = 'indication';
-      firstSearchIndicationInput.placeholder = 'Indication';
-      firstSearchIndicationInput.className = 'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600';
-      searchIndicationsContainer.appendChild(firstSearchIndicationInput);
-    });
-  </script>
-</body>
-</html>
